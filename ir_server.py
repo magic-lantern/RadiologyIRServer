@@ -39,6 +39,23 @@ searchResults_fields = {
 class searchResults(Resource):
 
     def xml_to_dict(self, xmlstr):
+        # XML Sample result
+        #
+        # <Figure>
+        #   <ResultID>1</ResultID>
+        #   <ThumbLocalLink>http://www.yottalook.com/images/thumbnails/small/cf6539a170fe8de1b15f581563580182540bdbf2.jpg</ThumbLocalLink>
+        #   <Source>AJR</Source>
+        #   <FullFigureLink>http://www.ajronline.org/content/198/3/W217/F5.expansion.html</FullFigureLink>
+        #   <ArticleTitle>Review: Inflammatory Pseudotumor: The Great Mimicker</ArticleTitle>
+        #   <ArticleLink>http://www.ajronline.org/content/198/3/W217.full</ArticleLink>
+        #   <ArticleLinkPDF>http://www.ajronline.org/content/198/3/W217.reprint</ArticleLinkPDF>
+        #   <FigsonlyLink>http://www.ajronline.org/content/198/3/W217.figsonly</FigsonlyLink>
+        #   <Caption>Fig. 4A —14-year-old girl with history of asthma. A,Axial (A)...</Caption>
+        #   <ImageType>CT</ImageType>
+        #   <Date>2012-03-01</Date>
+        #   <SubscriptionStatus>n</SubscriptionStatus>
+        # </Figure>
+        #
         root = etree.fromstring(xmlstr)
         retval = []
 
