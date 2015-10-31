@@ -2,6 +2,7 @@
 - pip=7.1.2=py34_0
 - python=3.4.3=2
 - readline=6.2=2
+- requests=2.8.1=py34_0
 - setuptools=18.4=py34_0
 - sqlite=3.8.4.1=1
 - tk=8.5.18=0
