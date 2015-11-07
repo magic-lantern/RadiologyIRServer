@@ -1,11 +1,12 @@
 from flask import Flask, got_request_exception
-from flask_restful import Resource, Api, fields, marshal_with
+from flask_restful import Resource, Api, fields, marshal_with, reqparse
 import requests
 import xml.etree.ElementTree as etree
 import uuid
 import time
 
 app = Flask(__name__)
+app.config['BUNDLE_ERRORS'] = True
 api = Api(app)
 
 @app.route('/')
@@ -88,7 +89,6 @@ class searchResults(Resource):
             figure['figsonlyLink'] = val.find('FigsonlyLink').text
             figure['caption'] = val.find('Caption').text
             figure['imageType'] = val.find('ImageType').text
-            #figure['date'] = time.strptime(val.find('Date').text, '%Y-%m-%d')
             figure['date'] = val.find('Date').text
             figure['subscriptionStatus'] = val.find('SubscriptionStatus').text
 
@@ -100,10 +100,46 @@ class searchResults(Resource):
 
     @marshal_with(searchResults_fields, envelope='searchResults')
     def get(self):
-        #
-        # need to parameterize this URL
-        #
-        resp = requests.get('http://www.yottalook.com/api_images_2_0.php?app_id=4b94305d853d3e7c91ed4774aa428f75&q=asthma&cl=50&t=yy')
+        # get request parameters
+        get_parser = reqparse.RequestParser()
+        url_parameters = ['modality', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
+        for u in url_parameters:
+            get_parser.add_argument(
+                u,
+                dest = u,
+                help = 'Text from ' + u + ' field',
+            )
+        args = get_parser.parse_args()
+
+        # build the parameterized URL for Yottalook
+        yottalook_url = 'http://www.yottalook.com/api_images_2_0.php'
+        query_terms = ''
+        for u in url_parameters[1:]:
+            if args[u] != None:
+                if " " in args[u]:
+                    query_terms += '"' + args[u] + '"+'
+                else:
+                    query_terms += args[u] + '+'
+        if query_terms.endswith('+'):
+            query_terms = query_terms[:-1]
+
+        yottalook_url += '?q=' + query_terms
+
+        # due to needing to customize query_terms, not including it as part of params dictionary
+        payload = {
+            'app_id' : '4b94305d853d3e7c91ed4774aa428f75',
+            'mod'    : args.modality,
+            'cl'     : 50,
+        }
+
+        prepared = requests.Request(url=yottalook_url).prepare()
+        prepared.prepare_url(prepared.url, payload)
+        #&t=yy required to be at the end of the URL
+        prepared.prepare_url(prepared.url, {'t' : 'yy'})
+
+        resp = requests.get(prepared.url)
+        print("    DEBUG URL : " + resp.url)
+
         if resp.status_code != 200:
             # This means something went wrong.
             print('GET YOTTALOOK returned status code: ', resp.status_code)
