@@ -58,3 +58,6 @@ target/
 
 # Custom ignore stuff
 .idea/
+
+# OSX specific files
+.DS_Store

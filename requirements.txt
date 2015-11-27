@@ -11,12 +11,14 @@
 - zlib=1.2.8=0
 - aniso8601==1.1.0
 - blinker==1.4
-- flask==0.10.1
-- flask-restful==0.3.4
+- Flask==0.10.1
+- Flask-RESTful==0.3.4
 - itsdangerous==0.24
-- jinja2==2.8
-- markupsafe==0.23
+- Jinja2==2.8
+- MarkupSafe==0.23
+- pysolr==3.3.3
 - python-dateutil==2.4.2
 - pytz==2015.7
 - six==1.10.0
-- werkzeug==0.10.4
+- Werkzeug==0.10.4
+
