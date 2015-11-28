@@ -3,15 +3,21 @@ from flask_restful import Resource, Api, fields, marshal_with, reqparse
 import requests
 import xml.etree.ElementTree as etree
 import uuid
-import time
+import pysolr
+import re
 
+
+############################
+# Application wide variables
 app = Flask(__name__)
 app.config['BUNDLE_ERRORS'] = True
 api = Api(app)
+url_parameters = ['modality', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
+############################
 
 @app.route('/')
 def hello_world():
-    return 'Hello World!'
+    return 'JSON API RESTFUL URL available at /searchResults'
 
 def log_exception(sender, exception, **extra):
     """ Log an exception to our logging framework """
@@ -24,17 +30,15 @@ got_request_exception.connect(log_exception, app)
 searchResults_fields = {
     'id' : fields.Integer(default=0),
     'resultID' : fields.Integer,
-    'thumbLocalLink' : fields.String(default=''),
+    'imageLink' : fields.String(default=''),
     'source' : fields.String(default=''),
-    'fullFigureLink' : fields.String(default=''),
-    'articleTitle' : fields.String(default=''),
+    'resultTitle' : fields.String(default=''),
+    'linkTitle' : fields.String(default=''),
     'articleLink' : fields.String(default=''),
-    'articleLinkPDF' : fields.String(default=''),
     'figsonlyLink' : fields.String(default=''),
-    'caption' : fields.String(default=''),
-    'imageType' : fields.String(default=''),
+    'content' : fields.String(default=''),
+    'modality' : fields.String(default=''),
     'date' : fields.String(default=''),
-    'subscriptionStatus' : fields.String(default='')
 }
 
 class searchResults(Resource):
@@ -74,25 +78,23 @@ class searchResults(Resource):
         #
 
         for idx, val in enumerate(root.findall('.//Figure')):
-            figure = {}
+            document = {}
 
             # map XML value to dictionary object - could use XML elements directly, but plan to change output
             # format eventually, so this will be needed soon
-            figure['id'] = uuid.uuid5(uuid.NAMESPACE_URL, val.find('FullFigureLink').text).int
-            figure['resultID'] = val.find('ResultID').text
-            figure['thumbLocalLink'] = val.find('ThumbLocalLink').text
-            figure['source'] = val.find('Source').text
-            figure['fullFigureLink'] = val.find('FullFigureLink').text
-            figure['articleTitle'] = val.find('ArticleTitle').text
-            figure['articleLink'] = val.find('ArticleLink').text
-            figure['articleLinkPDF'] = val.find('ArticleLinkPDF').text
-            figure['figsonlyLink'] = val.find('FigsonlyLink').text
-            figure['caption'] = val.find('Caption').text
-            figure['imageType'] = val.find('ImageType').text
-            figure['date'] = val.find('Date').text
-            figure['subscriptionStatus'] = val.find('SubscriptionStatus').text
+            document['id'] = uuid.uuid5(uuid.NAMESPACE_URL, val.find('FullFigureLink').text).int
+            document['resultID'] = val.find('ResultID').text
+            document['imageLink'] = val.find('ThumbLocalLink').text
+            document['source'] = val.find('Source').text
+            document['resultTitle'] = val.find('Caption').text
+            document['linkTitle'] = val.find('ArticleTitle').text
+            document['articleLink'] = val.find('ArticleLink').text
+            document['figsonlyLink'] = val.find('FigsonlyLink').text
+            document['content'] = val.find('Caption').text
+            document['modality'] = val.find('ImageType').text
+            document['date'] = val.find('Date').text
 
-            retval.append(figure)
+            retval.append(document)
 
         return retval
 
@@ -102,7 +104,6 @@ class searchResults(Resource):
     def get(self):
         # get request parameters
         get_parser = reqparse.RequestParser()
-        url_parameters = ['modality', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
         for u in url_parameters:
             get_parser.add_argument(
                 u,
@@ -151,6 +152,105 @@ class searchResults(Resource):
             return self.xml_to_dict(r)
 
 api.add_resource(searchResults, '/searchResults' )
+
+
+class solrSearch(Resource):
+
+    @marshal_with(searchResults_fields, envelope='searchResults')
+    def get(self):
+        # get request parameters
+        get_parser = reqparse.RequestParser()
+        solrquery = ''
+        retval = []
+
+        for u in url_parameters:
+            get_parser.add_argument(
+                u,
+                dest = u,
+                help = 'Text from ' + u + ' field',
+            )
+        args = get_parser.parse_args()
+
+        # handle the special cases
+        modality = args['modality']
+        if modality != None and modality != 'all':
+            if modality == 'XR':
+                solrquery = 'content:"modality conventional radiograph"~3 AND '
+            elif modality == 'NM':
+                solrquery = 'content:"modality nuc med"~7 OR content:"Nuclear Medicine" AND '
+            else:
+                solrquery = 'content:"modality ' + modality + '"~7 AND '
+
+        # search for gender - can't yet enter in UI
+        #results = solr.search('content:"patient: female"~7')
+        #results = solr.search('content:"patient: male"~7')
+
+        for u in url_parameters[1:]:
+            print(u)
+            if args[u] != None:
+                solrquery += 'content:"' + args[u] + '" AND '
+        if solrquery.endswith(' AND '):
+            solrquery = solrquery[:-5]
+
+        # Setup a Solr instance.
+        solr = pysolr.Solr('http://localhost:8983/solr/mypacs')
+
+        # sample SOLR result
+        # {
+        #     'date':'2012-04-27T15:58:26Z',
+        #     'boost':0.0,
+        #     'lastModified':'2012-04-27T15:58:26Z',
+        #     'url':'http://www.mypacs.net/cases/220339.html',
+        #     'contentLength':'6876',
+        #     'digest':'85dd4d2462da0ffecabe5ca711621cb4',
+        #     'title':[
+        #         'ANKLE PAIN FOLLOWING TRAUMA'
+        #     ],
+        #     'tstamp':'2015-12-20T04:54:49.803Z',
+        #     'id':'net.mypacs.www:http/cases/220339.html',
+        #     'content':'ANKLE PAIN FOLLOWING TRAUMA MyPACS.net: Radiology Teaching Files > Case 220339 \xa0 ANKLE PAIN FOLLOWING TRAUMA Contributed by: Lee Hoagland, Radiologist, University of Wisconsin, Madison, Wisconsin, USA. Patient: female History: Fall. Images: [small] larger Fig. 1: Axial CT through the distal tibia. Fig. 2: Sagittal CT reconstruction of the ankle. Fig. 3: Coronal CT reconstruction of the distal tibia. Findings: Fracture of the distal tibial epiphysis extending into the physis with widening of the lateral aspect of the growth plate. The medial portion of the physis is fused. Diagnosis: Juvenile Tillaux Fracture Comments: Nice case, Lee. Welcome to the club. -- Dean Thornton , 2003-11-13 Additional Details: Case Number: 220339 Last Updated: 2011-09-24 Anatomy: Skeletal System\xa0\xa0\xa0 Pathology: Trauma Modality: CT Access Level: Readable by all users The reader is fully responsible for confirming the accuracy of this content. Text and images may be copyrighted by the case author or institution. You can help keep MyPACS tidy: if you notice a case which is not useful (e.g. a test case) or inaccurate, please contact us .',
+        #     '_version_':1518338815171756034,
+        #     'type':[
+        #         'text/html',
+        #         'text',
+        #         'html'
+        #     ]
+        # }
+
+
+        print("solrquery: ", solrquery)
+        results = solr.search(solrquery)
+        counter = 1
+        for result in results:
+            document = {}
+            document['id'] = uuid.uuid5(uuid.NAMESPACE_URL, result['url']).int
+            document['resultID'] = counter
+            document['source'] = 'MyPACS'
+            document['resultTitle'] = result['title']
+            document['linkTitle'] = result['title']
+            document['articleLink'] = result['url']
+            document['content'] = result['content']
+
+            modality_pattern = re.compile('Modality: (.*) Access Level:')
+            modality_result = modality_pattern.search(result['content'])
+            if modality_result:
+                document['modality'] = modality_result.groups()[0]
+
+            lastupdated_pattern = re.compile('Last Updated: (\d{4}-\d{2}-\d{2})')
+            lastupdated_result = lastupdated_pattern.search(result['content'])
+            if lastupdated_result:
+                document['date'] = lastupdated_result.groups()[0]
+
+            counter += 1
+            retval.append(document)
+
+        # total number of matches found (will only see the first 10)
+        print("  Total Solr results found: ", results.hits)
+
+        return retval
+
+api.add_resource(solrSearch, '/solr' )
+
 
 # these response headers allow for client side code to request resources
 @app.after_request
