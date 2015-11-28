@@ -12,12 +12,19 @@ import re
 app = Flask(__name__)
 app.config['BUNDLE_ERRORS'] = True
 api = Api(app)
-url_parameters = ['modality', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
+url_parameters = ['modality', 'gender', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
 ############################
 
 @app.route('/')
 def hello_world():
-    return 'JSON API RESTFUL URL available at /searchResults'
+    return '<html><body>' \
+           + '<p>JSON API RESTFUL URL available at <a href="/searchResults">/searchResults</a></p>' \
+           + '<p>To test individual backends try:</p>' \
+           + '<ul>' \
+           + '<li><a href="/yottalook">/yottalook</a> - Yottalook search engine results</li>' \
+           + '<li><a href="/solr">/solr</a> - Solr search engine results</li>' \
+           + '</ul>' \
+           + '</body></html>'
 
 def log_exception(sender, exception, **extra):
     """ Log an exception to our logging framework """
@@ -41,9 +48,10 @@ searchResults_fields = {
     'date' : fields.String(default=''),
 }
 
-class searchResults(Resource):
 
-    def xml_to_dict(self, xmlstr):
+class yottalookSearch(Resource):
+
+    def xml_to_dict(xmlstr):
         # XML Sample result
         #
         # <Figure>
@@ -98,10 +106,7 @@ class searchResults(Resource):
 
         return retval
 
-
-
-    @marshal_with(searchResults_fields, envelope='searchResults')
-    def get(self):
+    def search():
         # get request parameters
         get_parser = reqparse.RequestParser()
         for u in url_parameters:
@@ -115,6 +120,7 @@ class searchResults(Resource):
         # build the parameterized URL for Yottalook
         yottalook_url = 'http://www.yottalook.com/api_images_2_0.php'
         query_terms = ''
+        # modality is a special case, so skip it and handle later
         for u in url_parameters[1:]:
             if args[u] != None:
                 if " " in args[u]:
@@ -149,15 +155,18 @@ class searchResults(Resource):
             r = resp.text
             r = r.split('\n', 1)[-1]
 
-            return self.xml_to_dict(r)
+            return yottalookSearch.xml_to_dict(r)
 
-api.add_resource(searchResults, '/searchResults' )
+    @marshal_with(searchResults_fields, envelope='searchResults')
+    def get(self):
+        return yottalookSearch.search()
+
+api.add_resource(yottalookSearch, '/yottalook' )
 
 
 class solrSearch(Resource):
 
-    @marshal_with(searchResults_fields, envelope='searchResults')
-    def get(self):
+    def search():
         # get request parameters
         get_parser = reqparse.RequestParser()
         solrquery = ''
@@ -181,12 +190,15 @@ class solrSearch(Resource):
             else:
                 solrquery = 'content:"modality ' + modality + '"~7 AND '
 
-        # search for gender - can't yet enter in UI
-        #results = solr.search('content:"patient: female"~7')
-        #results = solr.search('content:"patient: male"~7')
+        gender = args['gender']
+        if gender != None:
+            if gender == 'female':
+                solrquery = 'content:"patient: female"~7 AND '
+            elif gender == 'male':
+                solrquery = 'content:"patient: male"~7 AND '
 
-        for u in url_parameters[1:]:
-            print(u)
+        # handle remaining cases
+        for u in url_parameters[2:]:
             if args[u] != None:
                 solrquery += 'content:"' + args[u] + '" AND '
         if solrquery.endswith(' AND '):
@@ -226,8 +238,8 @@ class solrSearch(Resource):
             document['id'] = uuid.uuid5(uuid.NAMESPACE_URL, result['url']).int
             document['resultID'] = counter
             document['source'] = 'MyPACS'
-            document['resultTitle'] = result['title']
-            document['linkTitle'] = result['title']
+            document['resultTitle'] = result['title'][0]
+            document['linkTitle'] = result['title'][0]
             document['articleLink'] = result['url']
             document['content'] = result['content']
 
@@ -235,6 +247,8 @@ class solrSearch(Resource):
             modality_result = modality_pattern.search(result['content'])
             if modality_result:
                 document['modality'] = modality_result.groups()[0]
+            else:
+                document['modality'] = "See Article"
 
             lastupdated_pattern = re.compile('Last Updated: (\d{4}-\d{2}-\d{2})')
             lastupdated_result = lastupdated_pattern.search(result['content'])
@@ -247,10 +261,41 @@ class solrSearch(Resource):
         # total number of matches found (will only see the first 10)
         print("    Total Solr results found: ", results.hits)
 
-        return retval
+        if retval:
+            return retval
+        else:
+            return {}
+
+    @marshal_with(searchResults_fields, envelope='searchResults')
+    def get(self):
+        return solrSearch.search()
+
+
 
 api.add_resource(solrSearch, '/solr' )
 
+
+class searchResults(Resource):
+
+
+    @marshal_with(searchResults_fields, envelope='searchResults')
+    def get(self):
+        # call yottalookSearch
+        yr = yottalookSearch.search()
+
+        # call solrSearch
+        sr = solrSearch.search()
+
+        if yr:
+            print("Yottalook returned results")
+        if sr:
+            print("Solr returned restults")
+
+
+        # combine results and return
+        return yr + sr
+
+api.add_resource(searchResults, '/searchResults' )
 
 # these response headers allow for client side code to request resources
 @app.after_request
