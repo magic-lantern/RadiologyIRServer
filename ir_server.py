@@ -245,7 +245,7 @@ class solrSearch(Resource):
             retval.append(document)
 
         # total number of matches found (will only see the first 10)
-        print("  Total Solr results found: ", results.hits)
+        print("    Total Solr results found: ", results.hits)
 
         return retval
 
