@@ -5,23 +5,17 @@ This application was developed and tested with Python 3 (specifically 3.4). It l
 
 ## Installation & Usage
 
-Create a virtual python environment. I've used [Anaconda](https://www.continuum.io/downloads) There are numerous methods for creating a virtual environment - here's the steps for conda:
-
-```
-conda create --name myvenv flask
-source activate myvenv
-```
-
 Update ir_server.py to point to your Solr instance by changing this line:
 
 ```
 solr = pysolr.Solr('http://localhost:8983/solr/mypacs')
 ```
 
-Install the required libraries and start the service:
+I recommend creating a virtual python environment. I've used [Anaconda](https://www.continuum.io/downloads) There are numerous methods for creating a virtual environment - feel free to choose the one you like best. The following commands will create a virtual environment, install required dependencies, and launch the application:
 
 ```
 conda env create -f flask_conda_env.yml
+source activate flask
 python ir_server.py
 ```
 A pip requirements.txt file is also provided if you prefer to use pip and a different python virtual environment.
