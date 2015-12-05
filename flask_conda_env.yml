@@ -1,0 +1,26 @@
+name: flask
+dependencies:
+- flask=0.10.1=py34_1
+- itsdangerous=0.24=py34_0
+- jinja2=2.8=py34_0
+- markupsafe=0.23=py34_0
+- openssl=1.0.2d=0
+- pip=7.1.2=py34_0
+- python=3.4.3=2
+- readline=6.2=2
+- requests=2.8.1=py34_0
+- setuptools=18.5=py34_0
+- sqlite=3.8.4.1=1
+- tk=8.5.18=0
+- werkzeug=0.11.2=py34_0
+- wheel=0.26.0=py34_1
+- xz=5.0.5=0
+- zlib=1.2.8=0
+- pip:
+  - aniso8601==1.1.0
+  - blinker==1.4
+  - flask-restful==0.3.4
+  - pysolr==3.3.3
+  - python-dateutil==2.4.2
+  - pytz==2015.7
+  - six==1.10.0
