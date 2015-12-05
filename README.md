@@ -1,5 +1,5 @@
 # RadiologyIRServer
-Server side component to perform search and marshall data for [RadiologyIR](https://github.com/magic-lantern/RadiologyIR) client. Built using Flask and supporting [Solr](http://lucene.apache.org/solr/) and [Yottalook WS API](http://yottalook.com/api)
+Server side component to perform search and marshall data for [RadiologyIR](https://github.com/magic-lantern/RadiologyIR) client. Built using Flask and supporting [Solr](http://lucene.apache.org/solr/) and [Yottalook WS API](http://yottalook.com/api). As this application was designed with an Ember Data client, the REST services provided follow the [JSON API](jsonapi.org) specification.
 
 This application was developed and tested with Python 3 (specifically 3.4). It likely could work with Python 2 but would require some changes.
 
