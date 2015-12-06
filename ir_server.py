@@ -21,6 +21,7 @@ client = MongoClient("mongodb://localhost:27017")
 db = client['querysession']
 ############################
 
+
 @app.route('/')
 def hello_world():
     return '<html><body>' \
@@ -133,7 +134,7 @@ class yottalookSearch(Resource):
         query_terms = ''
         # modality is a special case, so skip it and handle later
         for u in url_parameters[1:]:
-            if args[u] != None:
+            if args[u] is not None:
                 if " " in args[u]:
                     query_terms += '"' + args[u] + '"+'
                 else:
@@ -193,7 +194,7 @@ class solrSearch(Resource):
 
         # handle the special cases
         modality = args['modality']
-        if modality != None and modality != 'all':
+        if modality is not None and modality != 'all':
             if modality == 'XR':
                 solrquery = 'content:"modality conventional radiograph"~3 AND '
             elif modality == 'NM':
@@ -202,7 +203,7 @@ class solrSearch(Resource):
                 solrquery = 'content:"modality ' + modality + '"~7 AND '
 
         gender = args['gender']
-        if gender != None:
+        if gender is not None:
             if gender == 'female':
                 solrquery = 'content:"patient: female"~7 AND '
             elif gender == 'male':
@@ -210,7 +211,7 @@ class solrSearch(Resource):
 
         # handle remaining cases
         for u in url_parameters[2:]:
-            if args[u] != None:
+            if args[u] is not None:
                 solrquery += 'content:"' + args[u] + '" AND '
         if solrquery.endswith(' AND '):
             solrquery = solrquery[:-5]
@@ -301,7 +302,7 @@ class searchResults(Resource):
         args = get_parser.parse_args()
         # don't need to log empty parameters
         for u in url_parameters:
-            if args[u] != None:
+            if args[u] is not None:
                 query_params[u] = args[u]
         result = db.querysession.insert_one({
             "queryParams": query_params,
@@ -356,7 +357,7 @@ class logClick(Resource):
             print(document)
             for r in document['results']:
                 if r['id'] == args['id']:
-                    r.setdefault('followed',[]).append(datetime.datetime.now())
+                    r.setdefault('followed', []).append(datetime.datetime.now())
                     r['followedCount'] = len(r['followed'])
                     db.querysession.replace_one({"_id": ObjectId(args['ObjectId'])}, document)
                     print("line 364")
@@ -364,15 +365,15 @@ class logClick(Resource):
 
         return
 
-api.add_resource(logClick, '/logClick' )
+api.add_resource(logClick, '/logClick')
 
 # these response headers allow for client side code to request resources
 @app.after_request
 def after_request(response):
-  response.headers.add('Access-Control-Allow-Origin', '*')
-  response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-  response.headers.add('Access-Control-Allow-Methods', 'GET,POST')
-  return response
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST')
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
