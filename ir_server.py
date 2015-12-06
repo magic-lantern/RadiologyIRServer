@@ -5,6 +5,9 @@ import xml.etree.ElementTree as etree
 import uuid
 import pysolr
 import re
+from pymongo import MongoClient
+import datetime
+from bson.objectid import ObjectId
 
 
 ############################
@@ -13,6 +16,9 @@ app = Flask(__name__)
 app.config['BUNDLE_ERRORS'] = True
 api = Api(app)
 url_parameters = ['modality', 'gender', 'indication', 'areaimaged', 'technique', 'comparison', 'findings', 'conclusions']
+# connect to mongodatabase
+client = MongoClient("mongodb://localhost:27017")
+db = client['querysession']
 ############################
 
 @app.route('/')
@@ -24,6 +30,9 @@ def hello_world():
            + '<li><a href="/yottalook">/yottalook</a> - Yottalook search engine results</li>' \
            + '<li><a href="/solr">/solr</a> - Solr search engine results</li>' \
            + '</ul>' \
+           + '<br />' \
+           + '<p>Tracking of links followed can be accomplished by POSTing "ObjectId" and "id" from a /searchResults response to: ' \
+           + '<a href="/logClick">/logClick</a>' \
            + '</body></html>'
 
 def log_exception(sender, exception, **extra):
@@ -35,7 +44,8 @@ def log_exception(sender, exception, **extra):
 got_request_exception.connect(log_exception, app)
 
 searchResults_fields = {
-    'id' : fields.Integer(default=0),
+    #'id' : fields.Integer(default=0),
+    'id' : fields.String(default=''),
     'resultID' : fields.Integer,
     'imageLink' : fields.String(default=''),
     'source' : fields.String(default=''),
@@ -46,6 +56,7 @@ searchResults_fields = {
     'content' : fields.String(default=''),
     'modality' : fields.String(default=''),
     'date' : fields.String(default=''),
+    'ObjectId' : fields.String(default=''),
 }
 
 
@@ -90,7 +101,7 @@ class yottalookSearch(Resource):
 
             # map XML value to dictionary object - could use XML elements directly, but plan to change output
             # format eventually, so this will be needed soon
-            document['id'] = uuid.uuid5(uuid.NAMESPACE_URL, val.find('FullFigureLink').text).int
+            document['id'] = str(uuid.uuid5(uuid.NAMESPACE_URL, val.find('FullFigureLink').text))
             document['resultID'] = val.find('ResultID').text
             document['imageLink'] = val.find('ThumbLocalLink').text
             document['source'] = val.find('Source').text
@@ -145,7 +156,7 @@ class yottalookSearch(Resource):
         prepared.prepare_url(prepared.url, {'t' : 'yy'})
 
         resp = requests.get(prepared.url)
-        print("    DEBUG URL : " + resp.url)
+        print("    DEBUG YOTTALOOK URL : " + resp.url)
 
         if resp.status_code != 200:
             # This means something went wrong.
@@ -230,18 +241,19 @@ class solrSearch(Resource):
         # }
 
 
-        print("solrquery: ", solrquery)
+        print("DEBUG solrquery: ", solrquery)
         results = solr.search(solrquery)
         counter = 1
         for result in results:
             document = {}
-            document['id'] = uuid.uuid5(uuid.NAMESPACE_URL, result['url']).int
+            document['id'] = str(uuid.uuid5(uuid.NAMESPACE_URL, result['url']))
             document['resultID'] = counter
             document['source'] = 'MyPACS'
             document['resultTitle'] = result['title'][0]
             document['linkTitle'] = result['title'][0]
             document['articleLink'] = result['url']
-            document['content'] = result['content']
+            document['content'] = result['content'][:500]
+
 
             modality_pattern = re.compile('Modality: (.*) Access Level:')
             modality_result = modality_pattern.search(result['content'])
@@ -264,19 +276,42 @@ class solrSearch(Resource):
         if retval:
             return retval
         else:
-            return {}
+            return []
 
     @marshal_with(searchResults_fields, envelope='searchResults')
     def get(self):
         return solrSearch.search()
-
-
 
 api.add_resource(solrSearch, '/solr' )
 
 
 class searchResults(Resource):
 
+    def log(self, r):
+        query_params = {}
+
+        print("r : ", r)
+        get_parser = reqparse.RequestParser()
+        for u in url_parameters:
+            get_parser.add_argument(
+                u,
+                dest = u,
+                help = 'Text from ' + u + ' field',
+            )
+        args = get_parser.parse_args()
+        # don't need to log empty parameters
+        for u in url_parameters:
+            if args[u] != None:
+                query_params[u] = args[u]
+        result = db.querysession.insert_one({
+            "queryParams": query_params,
+            "results": r,
+            "resultCount": len(r),
+            "datetime": datetime.datetime.now(),
+        })
+        for c in r:
+            c['ObjectId'] = str(result.inserted_id)
+        return r
 
     @marshal_with(searchResults_fields, envelope='searchResults')
     def get(self):
@@ -289,20 +324,54 @@ class searchResults(Resource):
         if yr:
             print("Yottalook returned results")
         if sr:
-            print("Solr returned restults")
+            print("Solr returned results")
 
+        combined_results = yr + sr
+
+        # resultID field is ordered per search engine, need to reset so it is for entire result set
+        counter = 1
+        for c in combined_results:
+            c["resultID"] = counter
+            counter += 1
+
+        # log process needs to inject MongoDB id back in so can be passed to Ember
+        combined_results = self.log(combined_results)
 
         # combine results and return
-        return yr + sr
+        return combined_results
 
 api.add_resource(searchResults, '/searchResults' )
+
+
+class logClick(Resource):
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('ObjectId', type=str, required=True, help='ObjectId from query session is required')
+        parser.add_argument('id', type=str, required=True, help='id from individual result is required')
+        args = parser.parse_args()
+
+        # update the one document to show link has been clicked
+        document = db.querysession.find_one({"_id": ObjectId(args['ObjectId'])})
+        if(document):
+            print(document)
+            for r in document['results']:
+                if r['id'] == args['id']:
+                    r.setdefault('followed',[]).append(datetime.datetime.now())
+                    r['followedCount'] = len(r['followed'])
+                    db.querysession.replace_one({"_id": ObjectId(args['ObjectId'])}, document)
+                    print("line 364")
+                    break
+
+        return
+
+api.add_resource(logClick, '/logClick' )
 
 # these response headers allow for client side code to request resources
 @app.after_request
 def after_request(response):
   response.headers.add('Access-Control-Allow-Origin', '*')
   response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-  response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE')
+  response.headers.add('Access-Control-Allow-Methods', 'GET,POST')
   return response
 
 if __name__ == '__main__':
