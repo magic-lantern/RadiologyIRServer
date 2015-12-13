@@ -12,6 +12,11 @@ Update ir_server.py to point to your Solr instance by changing this line:
 ```
 solr = pysolr.Solr('http://localhost:8983/solr/mypacs')
 ```
+Also, update code to point to your MongoDB instance by changing this line as appropriate:
+
+```
+client = MongoClient("mongodb://localhost:27017")
+```
 
 I recommend creating a virtual python environment. I've used [Anaconda](https://www.continuum.io/downloads) There are numerous methods for creating a virtual environment - feel free to choose the one you like best. The following commands will create a virtual environment, install required dependencies, and launch the application:
 
