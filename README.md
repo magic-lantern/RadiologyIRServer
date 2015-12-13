@@ -29,6 +29,12 @@ A pip requirements.txt file is also provided if you prefer to use pip and a diff
 
 Open http://localhost:5000 in your browser to verify.
 
+## Utilities
+
+As part of this project, I created a few additional python scripts to help with various items:
+* __mongo_test_queries.py__ - This file contains a few sample queries used to get statistics about what searches have been performed and what links have been clicked. It also includes a few basic items on how to use MongoDB as this was my first time using MongoDB.
+* __stopword_generator.py__ - This script will read in URLs, parse the returned HTML and identify words that occur in all documents. If a word occurs in all or most documents, it isn't a good word for a search query and should be ignored.
+
 ## License
 
 For code written by [magic-lantern](https://github.com/magic-lantern), see the [LICENSE](LICENSE.md) file for license rights and limitations (Apache License, Version 2.0).
