@@ -1,13 +1,20 @@
 name: flask
 dependencies:
+- beautifulsoup4=4.4.1=py34_0
 - flask=0.10.1=py34_1
 - itsdangerous=0.24=py34_0
 - jinja2=2.8=py34_0
+- libxml2=2.9.2=0
+- libxslt=1.1.28=2
+- lxml=3.5.0=py34_0
 - markupsafe=0.23=py34_0
+- nltk=3.1=py34_0
+- numpy=1.10.1=py34_0
 - openssl=1.0.2d=0
 - pip=7.1.2=py34_0
 - pymongo=3.0.3=py34_0
 - python=3.4.3=2
+- pyyaml=3.11=py34_1
 - readline=6.2=2
 - requests=2.8.1=py34_0
 - setuptools=18.5=py34_0
@@ -16,6 +23,7 @@ dependencies:
 - werkzeug=0.11.2=py34_0
 - wheel=0.26.0=py34_1
 - xz=5.0.5=0
+- yaml=0.1.6=0
 - zlib=1.2.8=0
 - pip:
   - aniso8601==1.1.0

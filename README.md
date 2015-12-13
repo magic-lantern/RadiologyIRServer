@@ -7,7 +7,7 @@ This application was developed and tested with Python 3 (specifically 3.4). It l
 
 ## Installation & Usage
 
-Update ir_server.py to point to your Solr instance by changing this line:
+Update ir_server.py to point to your Solr instance and collection/core by changing this line to match your environment:
 
 ```
 solr = pysolr.Solr('http://localhost:8983/solr/mypacs')
