@@ -18,25 +18,24 @@ for a in soup.find_all('a', href=True):
     #print("Found the URL:", a['href'])
     url = urljoin(base_url, a['href'])
     if url.find("cases") > -1:
-        urls.append(url)
-        counter += 1
         #print('Reading URL: ', url);
         html = request.urlopen(url).read().decode('utf8', 'ignore')
         raw = BeautifulSoup(html, 'lxml').get_text()
         # if bad page, should be ignored from total count
-        if raw.find('was not found on this server') > -1:
-            counter -= 1
-        else:
+        if raw.find('was not found on this server') < 0:
+            urls.append(url)
+            counter += 1
             tokens = word_tokenize(raw)
             words = [w.lower() for w in tokens]
             all_words.extend(set(words))
             #to analyze individual document frequency distribution
             #fd = FreqDist(words)
-        if counter > max_docs:
+        #else:
+            #print('URL ', url, ' had invalid contents')
+        if counter >= max_docs:
             break
 
 fd = FreqDist(all_words)
-print((counter*threshold))
 for word, count in fd.items():
     if(count >= (counter*threshold)):
         print(word, ' - ' , count)
